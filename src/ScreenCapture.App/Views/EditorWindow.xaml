@@ -1,0 +1,200 @@
+<Window x:Class="ScreenCapture.App.Views.EditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Image Editor"
+        Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="8">
+            <WrapPanel>
+                <!-- Selection Tool -->
+                <RadioButton x:Name="SelectionTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" IsChecked="True"
+                             ToolTip="Selection (V)" Checked="Tool_Checked" Tag="Selection">
+                    <TextBlock Text="&#x25BA;" FontSize="16"/>
+                </RadioButton>
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,8"/>
+
+                <!-- Arrow Tool -->
+                <RadioButton x:Name="ArrowTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Arrow (A)" Checked="Tool_Checked" Tag="Arrow">
+                    <TextBlock Text="&#x2192;" FontSize="20" FontWeight="Bold"/>
+                </RadioButton>
+
+                <!-- Line Tool -->
+                <RadioButton x:Name="LineTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Line (L)" Checked="Tool_Checked" Tag="Line">
+                    <Line X1="4" Y1="20" X2="20" Y2="4" Stroke="Black" StrokeThickness="2"/>
+                </RadioButton>
+
+                <!-- Rectangle Tool -->
+                <RadioButton x:Name="RectangleTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Rectangle (R)" Checked="Tool_Checked" Tag="Rectangle">
+                    <Rectangle Width="20" Height="16" Stroke="Black" StrokeThickness="2"/>
+                </RadioButton>
+
+                <!-- Ellipse Tool -->
+                <RadioButton x:Name="EllipseTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Ellipse (E)" Checked="Tool_Checked" Tag="Ellipse">
+                    <Ellipse Width="20" Height="16" Stroke="Black" StrokeThickness="2"/>
+                </RadioButton>
+
+                <!-- Highlighter Tool -->
+                <RadioButton x:Name="HighlighterTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Highlighter (H)" Checked="Tool_Checked" Tag="Highlighter">
+                    <Rectangle Width="20" Height="10" Fill="#80FFFF00"/>
+                </RadioButton>
+
+                <!-- Text Tool -->
+                <RadioButton x:Name="TextTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Text (T)" Checked="Tool_Checked" Tag="Text">
+                    <TextBlock Text="T" FontSize="18" FontWeight="Bold"/>
+                </RadioButton>
+
+                <!-- Step Number Tool -->
+                <RadioButton x:Name="StepTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Step Number (N)" Checked="Tool_Checked" Tag="Step">
+                    <Border Width="20" Height="20" CornerRadius="10" Background="{StaticResource PrimaryBrush}">
+                        <TextBlock Text="1" Foreground="White" FontSize="12" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </RadioButton>
+
+                <!-- Blur Tool -->
+                <RadioButton x:Name="BlurTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Blur/Pixelate (B)" Checked="Tool_Checked" Tag="Blur">
+                    <Grid Width="20" Height="16">
+                        <Rectangle Fill="#CCCCCC"/>
+                        <TextBlock Text="###" FontSize="8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </RadioButton>
+
+                <!-- Crop Tool -->
+                <RadioButton x:Name="CropTool" Style="{StaticResource ToolButton}"
+                             GroupName="Tools" ToolTip="Crop (C)" Checked="Tool_Checked" Tag="Crop">
+                    <Canvas Width="20" Height="16">
+                        <Line X1="0" Y1="4" X2="0" Y2="0" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="0" Y1="0" X2="6" Y2="0" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="14" Y1="0" X2="20" Y2="0" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="20" Y1="0" X2="20" Y2="4" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="20" Y1="12" X2="20" Y2="16" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="20" Y1="16" X2="14" Y2="16" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="6" Y1="16" X2="0" Y2="16" Stroke="Black" StrokeThickness="2"/>
+                        <Line X1="0" Y1="16" X2="0" Y2="12" Stroke="Black" StrokeThickness="2"/>
+                    </Canvas>
+                </RadioButton>
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,8"/>
+
+                <!-- Color Picker -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+                    <TextBlock Text="Color:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="ColorPicker" Width="80" SelectionChanged="ColorPicker_SelectionChanged">
+                        <ComboBoxItem IsSelected="True">
+                            <Rectangle Width="60" Height="16" Fill="Red"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="Blue"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="Green"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="Yellow"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="Orange"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="Purple"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="Black"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem>
+                            <Rectangle Width="60" Height="16" Fill="White" Stroke="Gray" StrokeThickness="1"/>
+                        </ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Stroke Width -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
+                    <TextBlock Text="Width:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="StrokeWidthPicker" Width="60" SelectionChanged="StrokeWidth_SelectionChanged">
+                        <ComboBoxItem Content="1" Tag="1"/>
+                        <ComboBoxItem Content="2" Tag="2" IsSelected="True"/>
+                        <ComboBoxItem Content="3" Tag="3"/>
+                        <ComboBoxItem Content="4" Tag="4"/>
+                        <ComboBoxItem Content="5" Tag="5"/>
+                        <ComboBoxItem Content="8" Tag="8"/>
+                        <ComboBoxItem Content="10" Tag="10"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,8"/>
+
+                <!-- Undo/Redo -->
+                <Button x:Name="UndoButton" Style="{StaticResource IconButton}"
+                        ToolTip="Undo (Ctrl+Z)" Click="UndoButton_Click">
+                    <TextBlock Text="&#x21B6;" FontSize="18"/>
+                </Button>
+                <Button x:Name="RedoButton" Style="{StaticResource IconButton}"
+                        ToolTip="Redo (Ctrl+Y)" Click="RedoButton_Click">
+                    <TextBlock Text="&#x21B7;" FontSize="18"/>
+                </Button>
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,8"/>
+
+                <!-- Save/Copy -->
+                <Button Content="Save" Style="{StaticResource PrimaryButton}"
+                        Click="SaveButton_Click" Margin="4,0" Padding="12,6"/>
+                <Button Content="Copy" Style="{StaticResource PrimaryButton}"
+                        Click="CopyButton_Click" Margin="4,0" Padding="12,6"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- Canvas Area -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto" Background="#404040">
+            <Grid x:Name="CanvasContainer" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+                <Border Background="White" Effect="{StaticResource Card.Effect}">
+                    <Grid>
+                        <Image x:Name="BackgroundImage" Stretch="None"/>
+                        <Canvas x:Name="AnnotationCanvas"
+                                Background="Transparent"
+                                MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
+                                MouseMove="Canvas_MouseMove"
+                                MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
+                                ClipToBounds="True"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="16,8">
+            <Grid>
+                <TextBlock x:Name="StatusText" Text="Ready"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="ZoomText" Text="100%"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,0"/>
+                    <TextBlock x:Name="SizeText" Text=""
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

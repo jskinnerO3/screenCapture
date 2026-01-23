@@ -1,0 +1,133 @@
+<Window x:Class="ScreenCapture.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        xmlns:vm="clr-namespace:ScreenCapture.App.ViewModels"
+        mc:Ignorable="d"
+        Title="Screen Capture" Height="500" Width="700"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title Bar -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="16">
+            <Grid>
+                <TextBlock Text="Screen Capture" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Settings" Style="{StaticResource IconButton}" Foreground="White"
+                            Click="SettingsButton_Click" Width="Auto" Padding="12,8"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16">
+            <StackPanel>
+                <!-- Quick Capture Section -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Quick Capture" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                        <WrapPanel>
+                            <Button Content="Full Screen" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding CaptureFullScreenCommand}" Margin="0,0,8,8"/>
+                            <Button Content="Primary Monitor" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding CapturePrimaryMonitorCommand}" Margin="0,0,8,8"/>
+                            <Button Content="Active Window" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding CaptureActiveWindowCommand}" Margin="0,0,8,8"/>
+                            <Button x:Name="RegionCaptureButton" Content="Select Region" Style="{StaticResource PrimaryButton}"
+                                    Click="RegionCaptureButton_Click" Margin="0,0,8,8"/>
+                            <Button x:Name="WindowPickerButton" Content="Pick Window" Style="{StaticResource PrimaryButton}"
+                                    Click="WindowPickerButton_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Screen Recording Section -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Screen Recording" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                        <WrapPanel>
+                            <Button x:Name="RecordButton" Style="{StaticResource PrimaryButton}"
+                                    Click="RecordButton_Click" Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="12" Height="12" Fill="Red" Margin="0,0,8,0"
+                                             Visibility="{Binding IsRecording, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock Text="{Binding IsRecording, Converter={StaticResource RecordingTextConverter}}"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Content="Scrolling Capture" Style="{StaticResource PrimaryButton}"
+                                    Click="ScrollingCaptureButton_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Preview Section -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,16">
+                            <TextBlock Text="Preview" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="CopyButton" Content="Copy" Style="{StaticResource PrimaryButton}"
+                                        Click="CopyButton_Click" Margin="0,0,8,0" Padding="12,6"/>
+                                <Button x:Name="SaveButton" Content="Save" Style="{StaticResource PrimaryButton}"
+                                        Click="SaveButton_Click" Margin="0,0,8,0" Padding="12,6"/>
+                                <Button x:Name="EditButton" Content="Edit" Style="{StaticResource PrimaryButton}"
+                                        Click="EditButton_Click" Padding="12,6"/>
+                            </StackPanel>
+                        </Grid>
+                        <Border Background="#E0E0E0" CornerRadius="4" MinHeight="200">
+                            <Image x:Name="PreviewImage" Stretch="Uniform" Margin="8"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" Padding="16,8"
+                BorderBrush="#E0E0E0" BorderThickness="0,1,0,0">
+            <Grid>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}">
+                    <Run Text="Hotkeys: PrintScreen (Full) | Alt+PrintScreen (Window) | Ctrl+Shift+S (Region)"/>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <!-- System Tray Icon -->
+        <tb:TaskbarIcon x:Name="TrayIcon"
+                        ToolTipText="Screen Capture"
+                        DoubleClickCommand="{Binding}"
+                        Visibility="Visible">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Capture Full Screen" Command="{Binding CaptureFullScreenCommand}"/>
+                    <MenuItem Header="Capture Active Window" Command="{Binding CaptureActiveWindowCommand}"/>
+                    <MenuItem Header="Capture Region" Click="RegionCaptureButton_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Start Recording" Command="{Binding ToggleRecordingCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}"/>
+                    <MenuItem Header="Show Window" Click="ShowWindow_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Exit" Command="{Binding ExitCommand}"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+    </Grid>
+</Window>
