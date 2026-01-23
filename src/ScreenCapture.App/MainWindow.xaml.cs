@@ -94,6 +94,7 @@ public partial class MainWindow : Window
     {
         _isActuallyClosing = true;
         Close();
+        Application.Current.Shutdown();
     }
 
     private void UpdateTrayIcon()

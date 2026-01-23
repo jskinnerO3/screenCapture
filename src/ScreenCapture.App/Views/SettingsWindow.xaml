@@ -43,6 +43,7 @@
                         <CheckBox Content="Play sound on capture" IsChecked="{Binding PlaySound}" Margin="0,8"/>
                         <CheckBox Content="Start minimized" IsChecked="{Binding StartMinimized}" Margin="0,8"/>
                         <CheckBox Content="Minimize to system tray" IsChecked="{Binding MinimizeToTray}" Margin="0,8"/>
+                        <CheckBox Content="Run at Windows startup" IsChecked="{Binding RunAtStartup}" Margin="0,8"/>
                     </StackPanel>
                 </Border>
 

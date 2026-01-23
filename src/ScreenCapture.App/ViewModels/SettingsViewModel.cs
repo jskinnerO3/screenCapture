@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using System.IO;
 using System.Text.Json;
 
@@ -11,6 +12,9 @@ public partial class SettingsViewModel : ObservableObject
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ScreenCapture",
         "settings.json");
+
+    private const string StartupRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string AppName = "ScreenCapture";
 
     [ObservableProperty]
     private string _savePath;
@@ -35,6 +39,9 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _minimizeToTray = true;
+
+    [ObservableProperty]
+    private bool _runAtStartup;
 
     [ObservableProperty]
     private int _recordingFrameRate = 30;
@@ -94,6 +101,7 @@ public partial class SettingsViewModel : ObservableObject
                 PlaySound = PlaySound,
                 StartMinimized = StartMinimized,
                 MinimizeToTray = MinimizeToTray,
+                RunAtStartup = RunAtStartup,
                 RecordingFrameRate = RecordingFrameRate,
                 VideoQuality = VideoQuality,
                 CaptureSystemAudio = CaptureSystemAudio,
@@ -102,6 +110,8 @@ public partial class SettingsViewModel : ObservableObject
 
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsPath, json);
+
+            UpdateStartupRegistry(RunAtStartup);
         }
         catch (Exception ex)
         {
@@ -128,16 +138,61 @@ public partial class SettingsViewModel : ObservableObject
                     PlaySound = settings.PlaySound;
                     StartMinimized = settings.StartMinimized;
                     MinimizeToTray = settings.MinimizeToTray;
+                    RunAtStartup = settings.RunAtStartup;
                     RecordingFrameRate = settings.RecordingFrameRate;
                     VideoQuality = settings.VideoQuality ?? VideoQuality;
                     CaptureSystemAudio = settings.CaptureSystemAudio;
                     CaptureMicrophone = settings.CaptureMicrophone;
                 }
             }
+            else
+            {
+                // No settings file, check registry for current startup state
+                RunAtStartup = IsInStartupRegistry();
+            }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
+        }
+    }
+
+    private void UpdateStartupRegistry(bool enable)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, writable: true);
+            if (key == null) return;
+
+            if (enable)
+            {
+                var exePath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    key.SetValue(AppName, $"\"{exePath}\" --minimized");
+                }
+            }
+            else
+            {
+                key.DeleteValue(AppName, throwOnMissingValue: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to update startup registry: {ex.Message}");
+        }
+    }
+
+    private bool IsInStartupRegistry()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey);
+            return key?.GetValue(AppName) != null;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -152,6 +207,7 @@ public partial class SettingsViewModel : ObservableObject
         PlaySound = true;
         StartMinimized = false;
         MinimizeToTray = true;
+        RunAtStartup = false;
         RecordingFrameRate = 30;
         VideoQuality = "High";
         CaptureSystemAudio = true;
@@ -169,6 +225,7 @@ public class SettingsData
     public bool PlaySound { get; set; }
     public bool StartMinimized { get; set; }
     public bool MinimizeToTray { get; set; }
+    public bool RunAtStartup { get; set; }
     public int RecordingFrameRate { get; set; }
     public string? VideoQuality { get; set; }
     public bool CaptureSystemAudio { get; set; }

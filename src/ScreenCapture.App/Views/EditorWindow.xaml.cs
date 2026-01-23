@@ -16,7 +16,7 @@ namespace ScreenCapture.App.Views;
 
 public partial class EditorWindow : Window
 {
-    private readonly Bitmap _originalImage;
+    private Bitmap _currentImage;
     private string _currentTool = "Selection";
     private System.Windows.Media.Color _currentColor = Colors.Red;
     private double _strokeWidth = 2;
@@ -31,7 +31,7 @@ public partial class EditorWindow : Window
     public EditorWindow(Bitmap image)
     {
         InitializeComponent();
-        _originalImage = image;
+        _currentImage = image;
 
         Loaded += EditorWindow_Loaded;
         KeyDown += EditorWindow_KeyDown;
@@ -39,7 +39,7 @@ public partial class EditorWindow : Window
 
     private void EditorWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        var bitmapImage = ConvertToBitmapImage(_originalImage);
+        var bitmapImage = ConvertToBitmapImage(_currentImage);
         BackgroundImage.Source = bitmapImage;
         AnnotationCanvas.Width = bitmapImage.Width;
         AnnotationCanvas.Height = bitmapImage.Height;
@@ -129,6 +129,9 @@ public partial class EditorWindow : Window
                 CreateStepNumber();
                 _isDrawing = false;
                 return;
+            case "Crop":
+                _currentShape = CreateCropSelection();
+                break;
         }
 
         if (_currentShape != null)
@@ -154,6 +157,7 @@ public partial class EditorWindow : Window
             case "Rectangle":
             case "Blur":
             case "Highlighter":
+            case "Crop":
                 UpdateRectangle(currentPoint);
                 break;
             case "Ellipse":
@@ -178,6 +182,12 @@ public partial class EditorWindow : Window
             else if (_currentTool == "Blur")
             {
                 ApplyBlurEffect((WpfRectangle)_currentShape);
+            }
+            else if (_currentTool == "Crop")
+            {
+                ApplyCrop((WpfRectangle)_currentShape);
+                _currentShape = null;
+                return; // Don't add to undo stack - crop modifies the image directly
             }
 
             _undoStack.Push(_currentShape);
@@ -323,7 +333,7 @@ public partial class EditorWindow : Window
         Canvas.SetTop(textBox, _startPoint.Y);
         AnnotationCanvas.Children.Add(textBox);
 
-        textBox.Focus();
+        Dispatcher.BeginInvoke(new Action(() => textBox.Focus()), System.Windows.Threading.DispatcherPriority.Input);
         textBox.LostFocus += (s, e) =>
         {
             if (string.IsNullOrWhiteSpace(textBox.Text))
@@ -375,11 +385,125 @@ public partial class EditorWindow : Window
         _stepNumber++;
     }
 
+    private WpfRectangle CreateCropSelection()
+    {
+        var rect = new WpfRectangle
+        {
+            Stroke = System.Windows.Media.Brushes.White,
+            StrokeThickness = 2,
+            StrokeDashArray = new DoubleCollection { 4, 4 },
+            Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(64, 0, 120, 215))
+        };
+        Canvas.SetLeft(rect, _startPoint.X);
+        Canvas.SetTop(rect, _startPoint.Y);
+        return rect;
+    }
+
+    private void ApplyCrop(WpfRectangle rect)
+    {
+        // Get the crop region coordinates
+        int x = (int)Canvas.GetLeft(rect);
+        int y = (int)Canvas.GetTop(rect);
+        int width = (int)rect.Width;
+        int height = (int)rect.Height;
+
+        // Remove the selection rectangle
+        AnnotationCanvas.Children.Remove(rect);
+
+        if (width <= 0 || height <= 0) return;
+
+        // Clamp to image bounds
+        x = Math.Max(0, Math.Min(x, _currentImage.Width - 1));
+        y = Math.Max(0, Math.Min(y, _currentImage.Height - 1));
+        width = Math.Min(width, _currentImage.Width - x);
+        height = Math.Min(height, _currentImage.Height - y);
+
+        if (width <= 0 || height <= 0) return;
+
+        // Create the cropped bitmap
+        var croppedBitmap = new Bitmap(width, height);
+        using (var g = Graphics.FromImage(croppedBitmap))
+        {
+            g.DrawImage(_currentImage,
+                new System.Drawing.Rectangle(0, 0, width, height),
+                new System.Drawing.Rectangle(x, y, width, height),
+                GraphicsUnit.Pixel);
+        }
+
+        // Update the current image
+        var oldImage = _currentImage;
+        _currentImage = croppedBitmap;
+        oldImage.Dispose();
+
+        // Update the display
+        var bitmapImage = ConvertToBitmapImage(_currentImage);
+        BackgroundImage.Source = bitmapImage;
+        AnnotationCanvas.Width = width;
+        AnnotationCanvas.Height = height;
+        SizeText.Text = $"{width} x {height}";
+
+        // Clear all annotations since their positions are now invalid
+        AnnotationCanvas.Children.Clear();
+        _undoStack.Clear();
+        _redoStack.Clear();
+
+        StatusText.Text = "Image cropped";
+    }
+
     private void ApplyBlurEffect(WpfRectangle rect)
     {
-        rect.Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 128, 128, 128));
+        // Get the region coordinates
+        int x = (int)Canvas.GetLeft(rect);
+        int y = (int)Canvas.GetTop(rect);
+        int width = (int)rect.Width;
+        int height = (int)rect.Height;
+
+        if (width <= 0 || height <= 0) return;
+
+        // Clamp to image bounds
+        x = Math.Max(0, Math.Min(x, _currentImage.Width - 1));
+        y = Math.Max(0, Math.Min(y, _currentImage.Height - 1));
+        width = Math.Min(width, _currentImage.Width - x);
+        height = Math.Min(height, _currentImage.Height - y);
+
+        if (width <= 0 || height <= 0) return;
+
+        // Create pixelated version of the region
+        int pixelSize = 8; // Size of each pixelation block
+        var pixelatedBitmap = new Bitmap(width, height);
+
+        using (var g = Graphics.FromImage(pixelatedBitmap))
+        {
+            // Process in blocks
+            for (int py = 0; py < height; py += pixelSize)
+            {
+                for (int px = 0; px < width; px += pixelSize)
+                {
+                    int blockWidth = Math.Min(pixelSize, width - px);
+                    int blockHeight = Math.Min(pixelSize, height - py);
+
+                    // Sample the center of the block from the original image
+                    int sampleX = x + px + blockWidth / 2;
+                    int sampleY = y + py + blockHeight / 2;
+                    sampleX = Math.Min(sampleX, _currentImage.Width - 1);
+                    sampleY = Math.Min(sampleY, _currentImage.Height - 1);
+
+                    var pixelColor = _currentImage.GetPixel(sampleX, sampleY);
+
+                    // Fill the entire block with the sampled color
+                    using var brush = new System.Drawing.SolidBrush(pixelColor);
+                    g.FillRectangle(brush, px, py, blockWidth, blockHeight);
+                }
+            }
+        }
+
+        // Convert to WPF ImageBrush
+        var bitmapImage = ConvertToBitmapImage(pixelatedBitmap);
+        rect.Fill = new ImageBrush(bitmapImage);
         rect.Stroke = System.Windows.Media.Brushes.Transparent;
-        rect.Effect = new System.Windows.Media.Effects.BlurEffect { Radius = 10 };
+        rect.Effect = null; // No blur effect needed - we have true pixelation
+
+        pixelatedBitmap.Dispose();
     }
 
     private void UndoButton_Click(object sender, RoutedEventArgs e)
