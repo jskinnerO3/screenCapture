@@ -27,6 +27,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _savePath;
 
+    [ObservableProperty]
+    private string? _lastSavedFilePath;
+
     public MainViewModel()
     {
         _screenCaptureService = new ScreenCaptureService();
@@ -114,7 +117,19 @@ public partial class MainViewModel : ObservableObject
         if (result.IsSuccess && result.Image != null)
         {
             LastCapture = result;
-            StatusMessage = $"Captured at {result.CapturedAt:HH:mm:ss}";
+
+            // Auto-save to Screenshots folder
+            var savedPath = QuickSave();
+            if (!string.IsNullOrEmpty(savedPath))
+            {
+                LastSavedFilePath = savedPath;
+                StatusMessage = $"Captured and saved at {result.CapturedAt:HH:mm:ss}";
+            }
+            else
+            {
+                LastSavedFilePath = null;
+                StatusMessage = $"Captured at {result.CapturedAt:HH:mm:ss}";
+            }
         }
         else
         {

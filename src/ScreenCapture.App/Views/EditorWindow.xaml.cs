@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.Collections.ObjectModel;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -14,6 +15,14 @@ using WpfEllipse = System.Windows.Shapes.Ellipse;
 
 namespace ScreenCapture.App.Views;
 
+public class RecentCapture
+{
+    public string FilePath { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public BitmapImage? Thumbnail { get; set; }
+    public DateTime CapturedAt { get; set; }
+}
+
 public partial class EditorWindow : Window
 {
     private Bitmap _currentImage;
@@ -27,14 +36,29 @@ public partial class EditorWindow : Window
 
     private readonly Stack<UIElement> _undoStack = new();
     private readonly Stack<UIElement> _redoStack = new();
+    private readonly ObservableCollection<RecentCapture> _recentCaptures = new();
+    private readonly string _screenshotsPath;
+    private FileSystemWatcher? _fileWatcher;
+    private string? _currentFilePath;
 
-    public EditorWindow(Bitmap image)
+    public EditorWindow(Bitmap image) : this(image, null)
+    {
+    }
+
+    public EditorWindow(Bitmap image, string? filePath)
     {
         InitializeComponent();
         _currentImage = image;
+        _screenshotsPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
+        _currentFilePath = filePath;
+
+        ThumbnailsPanel.ItemsSource = _recentCaptures;
 
         Loaded += EditorWindow_Loaded;
         KeyDown += EditorWindow_KeyDown;
+        Closed += EditorWindow_Closed;
+
+        SetupFileWatcher();
     }
 
     private void EditorWindow_Loaded(object sender, RoutedEventArgs e)
@@ -44,6 +68,8 @@ public partial class EditorWindow : Window
         AnnotationCanvas.Width = bitmapImage.Width;
         AnnotationCanvas.Height = bitmapImage.Height;
         SizeText.Text = $"{bitmapImage.PixelWidth} x {bitmapImage.PixelHeight}";
+
+        LoadRecentCaptures();
     }
 
     private void EditorWindow_KeyDown(object sender, KeyEventArgs e)
@@ -187,12 +213,14 @@ public partial class EditorWindow : Window
             {
                 ApplyCrop((WpfRectangle)_currentShape);
                 _currentShape = null;
+                AutoSave();
                 return; // Don't add to undo stack - crop modifies the image directly
             }
 
             _undoStack.Push(_currentShape);
             _redoStack.Clear();
             _currentShape = null;
+            AutoSave();
         }
     }
 
@@ -354,6 +382,7 @@ public partial class EditorWindow : Window
                 AnnotationCanvas.Children.Add(textBlock);
                 _undoStack.Push(textBlock);
                 _redoStack.Clear();
+                AutoSave();
             }
         };
     }
@@ -383,6 +412,7 @@ public partial class EditorWindow : Window
         _undoStack.Push(border);
         _redoStack.Clear();
         _stepNumber++;
+        AutoSave();
     }
 
     private WpfRectangle CreateCropSelection()
@@ -559,6 +589,41 @@ public partial class EditorWindow : Window
         encoder.Save(stream);
     }
 
+    private void AutoSave()
+    {
+        try
+        {
+            // If we don't have a file path yet, create one
+            if (string.IsNullOrEmpty(_currentFilePath))
+            {
+                if (!Directory.Exists(_screenshotsPath))
+                {
+                    Directory.CreateDirectory(_screenshotsPath);
+                }
+                _currentFilePath = System.IO.Path.Combine(_screenshotsPath, $"Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+            }
+
+            // Temporarily disable file watcher to avoid duplicate notifications
+            if (_fileWatcher != null)
+            {
+                _fileWatcher.EnableRaisingEvents = false;
+            }
+
+            SaveImage(_currentFilePath);
+            StatusText.Text = $"Auto-saved to {System.IO.Path.GetFileName(_currentFilePath)}";
+
+            // Re-enable file watcher
+            if (_fileWatcher != null)
+            {
+                _fileWatcher.EnableRaisingEvents = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Auto-save failed: {ex.Message}";
+        }
+    }
+
     private BitmapEncoder GetEncoder(string path)
     {
         var ext = System.IO.Path.GetExtension(path).ToLower();
@@ -618,5 +683,174 @@ public partial class EditorWindow : Window
         bitmapImage.Freeze();
 
         return bitmapImage;
+    }
+
+    private void SetupFileWatcher()
+    {
+        if (!Directory.Exists(_screenshotsPath))
+        {
+            Directory.CreateDirectory(_screenshotsPath);
+        }
+
+        _fileWatcher = new FileSystemWatcher(_screenshotsPath)
+        {
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+            EnableRaisingEvents = true
+        };
+
+        _fileWatcher.Created += OnFileCreated;
+        _fileWatcher.Renamed += OnFileCreated;
+    }
+
+    private void OnFileCreated(object sender, FileSystemEventArgs e)
+    {
+        var ext = System.IO.Path.GetExtension(e.FullPath).ToLower();
+        if (ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".bmp")
+            return;
+
+        // Delay slightly to ensure file is fully written
+        System.Threading.Tasks.Task.Delay(200).ContinueWith(_ =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    var thumbnail = CreateThumbnail(e.FullPath);
+                    if (thumbnail != null)
+                    {
+                        var capture = new RecentCapture
+                        {
+                            FilePath = e.FullPath,
+                            FileName = System.IO.Path.GetFileName(e.FullPath),
+                            Thumbnail = thumbnail,
+                            CapturedAt = DateTime.Now
+                        };
+
+                        // Insert at the beginning
+                        _recentCaptures.Insert(0, capture);
+
+                        // Keep only 20 items
+                        while (_recentCaptures.Count > 20)
+                        {
+                            _recentCaptures.RemoveAt(_recentCaptures.Count - 1);
+                        }
+                    }
+                }
+                catch
+                {
+                    // File might still be locked, ignore
+                }
+            });
+        });
+    }
+
+    private void EditorWindow_Closed(object? sender, EventArgs e)
+    {
+        if (_fileWatcher != null)
+        {
+            _fileWatcher.EnableRaisingEvents = false;
+            _fileWatcher.Dispose();
+            _fileWatcher = null;
+        }
+    }
+
+    private void LoadRecentCaptures()
+    {
+        _recentCaptures.Clear();
+
+        if (!Directory.Exists(_screenshotsPath))
+            return;
+
+        var imageFiles = Directory.GetFiles(_screenshotsPath, "*.png")
+            .Concat(Directory.GetFiles(_screenshotsPath, "*.jpg"))
+            .Concat(Directory.GetFiles(_screenshotsPath, "*.bmp"))
+            .Select(f => new FileInfo(f))
+            .OrderByDescending(f => f.LastWriteTime)
+            .Take(20)
+            .ToList();
+
+        foreach (var file in imageFiles)
+        {
+            try
+            {
+                var thumbnail = CreateThumbnail(file.FullName);
+                if (thumbnail != null)
+                {
+                    _recentCaptures.Add(new RecentCapture
+                    {
+                        FilePath = file.FullName,
+                        FileName = file.Name,
+                        Thumbnail = thumbnail,
+                        CapturedAt = file.LastWriteTime
+                    });
+                }
+            }
+            catch
+            {
+                // Skip files that can't be loaded
+            }
+        }
+    }
+
+    private static BitmapImage? CreateThumbnail(string filePath)
+    {
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri(filePath);
+            bitmap.DecodePixelHeight = 60;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void Thumbnail_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Border border && border.DataContext is RecentCapture capture)
+        {
+            LoadImageFromFile(capture.FilePath);
+        }
+    }
+
+    private void LoadImageFromFile(string filePath)
+    {
+        try
+        {
+            var newImage = new Bitmap(filePath);
+
+            // Dispose old image
+            var oldImage = _currentImage;
+            _currentImage = newImage;
+            oldImage.Dispose();
+
+            // Set the current file path for auto-save
+            _currentFilePath = filePath;
+
+            // Update the display
+            var bitmapImage = ConvertToBitmapImage(_currentImage);
+            BackgroundImage.Source = bitmapImage;
+            AnnotationCanvas.Width = bitmapImage.Width;
+            AnnotationCanvas.Height = bitmapImage.Height;
+            SizeText.Text = $"{bitmapImage.PixelWidth} x {bitmapImage.PixelHeight}";
+
+            // Clear annotations and undo/redo stacks
+            AnnotationCanvas.Children.Clear();
+            _undoStack.Clear();
+            _redoStack.Clear();
+            _stepNumber = 1;
+
+            StatusText.Text = $"Loaded: {System.IO.Path.GetFileName(filePath)}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Failed to load image: {ex.Message}";
+        }
     }
 }

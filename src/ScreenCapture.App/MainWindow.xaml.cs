@@ -132,6 +132,14 @@ public partial class MainWindow : Window
     private void StartRegionCapture()
     {
         Hide();
+
+        // Hide any open editor windows during region selection
+        var editorWindows = Application.Current.Windows.OfType<EditorWindow>().ToList();
+        foreach (var editorWindow in editorWindows)
+        {
+            editorWindow.Hide();
+        }
+
         Thread.Sleep(200);
 
         var overlay = new CaptureOverlay();
@@ -140,17 +148,32 @@ public partial class MainWindow : Window
             ViewModel.CaptureRegion(region);
             if (ViewModel.LastCapture?.Image != null)
             {
-                var editor = new EditorWindow(ViewModel.LastCapture.Image);
+                // Close any previous editor windows since we're opening a new one
+                foreach (var editorWindow in editorWindows)
+                {
+                    editorWindow.Close();
+                }
+                var editor = new EditorWindow(ViewModel.LastCapture.Image, ViewModel.LastSavedFilePath);
                 editor.Show();
             }
             else
             {
+                // Restore editor windows if capture failed
+                foreach (var editorWindow in editorWindows)
+                {
+                    editorWindow.Show();
+                }
                 Show();
                 Activate();
             }
         };
         overlay.Cancelled += (s, _) =>
         {
+            // Restore editor windows on cancel
+            foreach (var editorWindow in editorWindows)
+            {
+                editorWindow.Show();
+            }
             Show();
             Activate();
         };
@@ -258,7 +281,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var editor = new EditorWindow(ViewModel.LastCapture.Image);
+        var editor = new EditorWindow(ViewModel.LastCapture.Image, ViewModel.LastSavedFilePath);
         editor.Show();
     }
 
