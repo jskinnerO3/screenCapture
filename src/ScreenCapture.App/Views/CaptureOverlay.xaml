@@ -7,7 +7,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        WindowState="Maximized"
+        WindowState="Normal"
         Cursor="Cross">
 
     <Grid>

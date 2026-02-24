@@ -36,7 +36,15 @@ public partial class CaptureOverlay : Window
         MouseLeftButtonUp += OnMouseLeftButtonUp;
         KeyDown += OnKeyDown;
 
-        Loaded += (s, e) => Focus();
+        Loaded += (s, e) =>
+        {
+            // Position window to span all monitors (virtual screen)
+            Left = SystemParameters.VirtualScreenLeft;
+            Top = SystemParameters.VirtualScreenTop;
+            Width = SystemParameters.VirtualScreenWidth;
+            Height = SystemParameters.VirtualScreenHeight;
+            Focus();
+        };
     }
 
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -112,7 +120,10 @@ public partial class CaptureOverlay : Window
 
         if (width > 5 && height > 5)
         {
-            var region = new DrawingRectangle(x, y, width, height);
+            // Offset by virtual screen origin to get absolute screen coordinates
+            var screenX = x + (int)SystemParameters.VirtualScreenLeft;
+            var screenY = y + (int)SystemParameters.VirtualScreenTop;
+            var region = new DrawingRectangle(screenX, screenY, width, height);
             Close();
             RegionSelected?.Invoke(this, region);
         }
