@@ -228,7 +228,26 @@
                                     <Border.Effect>
                                         <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.15" Direction="270"/>
                                     </Border.Effect>
-                                    <Image Source="{Binding Thumbnail}" Width="80" Height="60" Stretch="Uniform"/>
+                                    <Grid>
+                                        <Image Source="{Binding Thumbnail}" Width="80" Height="60" Stretch="Uniform"/>
+                                        <Button Content="&#x2715;"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Width="16" Height="16" Padding="0" Margin="0,-2,-2,0"
+                                                FontSize="10" FontWeight="Bold" Cursor="Hand"
+                                                Foreground="White" Background="#C0FF0000" BorderThickness="0"
+                                                Click="DeleteCapture_Click">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Style.Triggers>

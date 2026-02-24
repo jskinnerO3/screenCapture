@@ -811,6 +811,36 @@ public partial class EditorWindow : Window
         }
     }
 
+    private void DeleteCapture_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.DataContext is RecentCapture capture)
+        {
+            var result = MessageBox.Show(
+                $"Delete \"{capture.FileName}\"?\n\nThis will permanently delete the file from disk.",
+                "Delete Capture",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    if (File.Exists(capture.FilePath))
+                    {
+                        File.Delete(capture.FilePath);
+                    }
+                    _recentCaptures.Remove(capture);
+                    StatusText.Text = $"Deleted: {capture.FileName}";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to delete file: {ex.Message}", "Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+    }
+
     private void Thumbnail_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is Border border && border.DataContext is RecentCapture capture)
