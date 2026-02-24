@@ -148,6 +148,7 @@ public partial class MainWindow : Window
             ViewModel.CaptureRegion(region);
             if (ViewModel.LastCapture?.Image != null)
             {
+                ViewModel.CopyToClipboard();
                 // Close any previous editor windows since we're opening a new one
                 foreach (var editorWindow in editorWindows)
                 {
