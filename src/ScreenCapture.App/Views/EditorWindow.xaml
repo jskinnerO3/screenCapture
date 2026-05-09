@@ -162,6 +162,10 @@
                         Click="SaveButton_Click" Margin="4,0" Padding="12,6"/>
                 <Button Content="Copy" Style="{StaticResource PrimaryButton}"
                         Click="CopyButton_Click" Margin="4,0" Padding="12,6"/>
+                <Button x:Name="CopyPathButton" Content="Copy Path" Style="{StaticResource PrimaryButton}"
+                        Click="CopyPathButton_Click" Margin="4,0" Padding="12,6"
+                        ToolTip="Copy the full file path of the saved image to the clipboard"
+                        IsEnabled="False"/>
             </WrapPanel>
         </Border>
 

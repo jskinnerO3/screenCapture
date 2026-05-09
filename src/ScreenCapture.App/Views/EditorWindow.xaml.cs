@@ -70,6 +70,7 @@ public partial class EditorWindow : Window
         SizeText.Text = $"{bitmapImage.PixelWidth} x {bitmapImage.PixelHeight}";
 
         LoadRecentCaptures();
+        UpdateCopyPathButtonState();
     }
 
     private void EditorWindow_KeyDown(object sender, KeyEventArgs e)
@@ -568,7 +569,9 @@ public partial class EditorWindow : Window
         if (dialog.ShowDialog() == true)
         {
             SaveImage(dialog.FileName);
+            _currentFilePath = dialog.FileName;
             StatusText.Text = $"Saved to {dialog.FileName}";
+            UpdateCopyPathButtonState();
         }
     }
 
@@ -577,6 +580,20 @@ public partial class EditorWindow : Window
         var bitmap = RenderToBitmap();
         Clipboard.SetImage(bitmap);
         StatusText.Text = "Copied to clipboard";
+    }
+
+    private void CopyPathButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentFilePath) || !File.Exists(_currentFilePath))
+            return;
+
+        Clipboard.SetText(_currentFilePath);
+        StatusText.Text = $"Copied path: {_currentFilePath}";
+    }
+
+    private void UpdateCopyPathButtonState()
+    {
+        CopyPathButton.IsEnabled = !string.IsNullOrEmpty(_currentFilePath) && File.Exists(_currentFilePath);
     }
 
     private void SaveImage(string path)
@@ -611,6 +628,7 @@ public partial class EditorWindow : Window
 
             SaveImage(_currentFilePath);
             StatusText.Text = $"Auto-saved to {System.IO.Path.GetFileName(_currentFilePath)}";
+            UpdateCopyPathButtonState();
 
             // Re-enable file watcher
             if (_fileWatcher != null)
@@ -831,6 +849,7 @@ public partial class EditorWindow : Window
                     }
                     _recentCaptures.Remove(capture);
                     StatusText.Text = $"Deleted: {capture.FileName}";
+                    UpdateCopyPathButtonState();
                 }
                 catch (Exception ex)
                 {
@@ -877,6 +896,7 @@ public partial class EditorWindow : Window
             _stepNumber = 1;
 
             StatusText.Text = $"Loaded: {System.IO.Path.GetFileName(filePath)}";
+            UpdateCopyPathButtonState();
         }
         catch (Exception ex)
         {
