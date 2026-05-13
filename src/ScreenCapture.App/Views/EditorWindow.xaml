@@ -166,6 +166,9 @@
                         Click="CopyPathButton_Click" Margin="4,0" Padding="12,6"
                         ToolTip="Copy the full file path of the saved image to the clipboard"
                         IsEnabled="False"/>
+                <Button x:Name="ExtractTextButton" Content="Extract Text" Style="{StaticResource PrimaryButton}"
+                        Click="ExtractTextButton_Click" Margin="4,0" Padding="12,6"
+                        ToolTip="Extract any text from the image and copy as plain text to the clipboard"/>
             </WrapPanel>
         </Border>
 

@@ -9,9 +9,12 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using Windows.Media.Ocr;
+using Windows.Storage.Streams;
 using WpfPoint = System.Windows.Point;
 using WpfRectangle = System.Windows.Shapes.Rectangle;
 using WpfEllipse = System.Windows.Shapes.Ellipse;
+using WinRtBitmapDecoder = Windows.Graphics.Imaging.BitmapDecoder;
 
 namespace ScreenCapture.App.Views;
 
@@ -594,6 +597,135 @@ public partial class EditorWindow : Window
     private void UpdateCopyPathButtonState()
     {
         CopyPathButton.IsEnabled = !string.IsNullOrEmpty(_currentFilePath) && File.Exists(_currentFilePath);
+    }
+
+    private static Bitmap PrepareForOcr(Bitmap source, int maxDimension)
+    {
+        // Windows OCR works best when the smaller dimension is at least a few hundred pixels.
+        // Tiny strips of text fail silently. Upscale small inputs, but never exceed maxDimension.
+        const int targetMinDimension = 400;
+        int minDim = Math.Min(source.Width, source.Height);
+        int maxDim = Math.Max(source.Width, source.Height);
+
+        double scale = 1.0;
+        if (minDim < targetMinDimension)
+            scale = (double)targetMinDimension / minDim;
+        if (maxDim * scale > maxDimension)
+            scale = (double)maxDimension / maxDim;
+
+        int newWidth = Math.Max(1, (int)Math.Round(source.Width * scale));
+        int newHeight = Math.Max(1, (int)Math.Round(source.Height * scale));
+
+        if (newWidth == source.Width && newHeight == source.Height)
+            return new Bitmap(source);
+
+        var scaled = new Bitmap(newWidth, newHeight);
+        using var g = Graphics.FromImage(scaled);
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+        g.DrawImage(source, 0, 0, newWidth, newHeight);
+        return scaled;
+    }
+
+    private static Bitmap InvertColors(Bitmap source)
+    {
+        var inverted = new Bitmap(source.Width, source.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var rect = new System.Drawing.Rectangle(0, 0, source.Width, source.Height);
+
+        var srcData = source.LockBits(rect, ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var dstData = inverted.LockBits(rect, ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            int bytes = Math.Abs(srcData.Stride) * source.Height;
+            var buffer = new byte[bytes];
+            System.Runtime.InteropServices.Marshal.Copy(srcData.Scan0, buffer, 0, bytes);
+            for (int i = 0; i < bytes; i += 4)
+            {
+                buffer[i] = (byte)(255 - buffer[i]);         // B
+                buffer[i + 1] = (byte)(255 - buffer[i + 1]); // G
+                buffer[i + 2] = (byte)(255 - buffer[i + 2]); // R
+                // Alpha unchanged
+            }
+            System.Runtime.InteropServices.Marshal.Copy(buffer, 0, dstData.Scan0, bytes);
+        }
+        finally
+        {
+            source.UnlockBits(srcData);
+            inverted.UnlockBits(dstData);
+        }
+        return inverted;
+    }
+
+    private static async Task<string> RunOcrAsync(OcrEngine engine, Bitmap bitmap)
+    {
+        using var ms = new MemoryStream();
+        bitmap.Save(ms, ImageFormat.Png);
+        ms.Position = 0;
+
+        using var randomAccessStream = ms.AsRandomAccessStream();
+        var decoder = await WinRtBitmapDecoder.CreateAsync(randomAccessStream);
+        using var softwareBitmap = await decoder.GetSoftwareBitmapAsync();
+
+        var result = await engine.RecognizeAsync(softwareBitmap);
+        return string.Join(Environment.NewLine, result.Lines.Select(l => l.Text));
+    }
+
+    private async void ExtractTextButton_Click(object sender, RoutedEventArgs e)
+    {
+        ExtractTextButton.IsEnabled = false;
+        StatusText.Text = "Extracting text...";
+
+        try
+        {
+            var ocrEngine = OcrEngine.TryCreateFromUserProfileLanguages()
+                ?? OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US"));
+
+            if (ocrEngine == null)
+            {
+                MessageBox.Show(
+                    "No OCR language pack is available on this system. Install one via Settings > Time & Language > Language.",
+                    "OCR unavailable", MessageBoxButton.OK, MessageBoxImage.Warning);
+                StatusText.Text = "OCR is not available on this system";
+                return;
+            }
+
+            var maxDim = (int)OcrEngine.MaxImageDimension;
+            using var imageForOcr = PrepareForOcr(_currentImage, maxDim);
+
+            var text = await RunOcrAsync(ocrEngine, imageForOcr);
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                // Retry with inverted colors for light-text-on-dark images
+                using var inverted = InvertColors(imageForOcr);
+                text = await RunOcrAsync(ocrEngine, inverted);
+            }
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                StatusText.Text = "No text found in image";
+                return;
+            }
+
+            Clipboard.SetText(text);
+            StatusText.Text = $"Copied {text.Length} characters of extracted text to clipboard";
+
+            var preview = text.Length > 200 ? text.Substring(0, 200) + "..." : text;
+            MessageBox.Show(
+                $"Copied {text.Length} characters to the clipboard.\n\nPreview:\n{preview}",
+                "Text extracted", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Text extraction failed:\n\n{ex}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = $"Text extraction failed: {ex.Message}";
+        }
+        finally
+        {
+            ExtractTextButton.IsEnabled = true;
+        }
     }
 
     private void SaveImage(string path)
